@@ -7,11 +7,10 @@ plugins {
 
 
 // 🔑 Cargar archivo keys.properties
-val keystoreFile = rootProject.file("key.properties")
+val keysPropertiesFile = rootProject.file("key.properties")
 val keysProperties = Properties()
-if (keystoreFile.exists()) {
-    keysProperties.load(keystoreFile.inputStream())
-
+if (keysPropertiesFile.exists()) {
+    keysProperties.load(keysPropertiesFile.inputStream())
 }
 
 
@@ -35,7 +34,9 @@ android {
             "OPENAI_API_KEY",
             "\"${keysProperties.getProperty("OPENAI_API_KEY") ?: ""}\""
         )
-
+        buildConfigField(
+            "String", "OWM_API_KEY", "\"${keysProperties.getProperty("OWM_API_KEY") ?: ""}\""
+        )
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -85,4 +86,5 @@ dependencies {
     implementation("com.squareup.moshi:moshi-kotlin:1.15.1")
 
     implementation("androidx.activity:activity-ktx:1.9.0")
+    implementation("com.google.android.gms:play-services-maps:18.2.0")
 }

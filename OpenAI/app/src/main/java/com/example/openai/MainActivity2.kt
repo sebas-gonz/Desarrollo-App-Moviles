@@ -32,6 +32,12 @@ class MainActivity2 : AppCompatActivity() {
             startActivity(nuevaVentana)
         }
 
+        val btn_mapa: Button = findViewById(R.id.btn_api_clima)
+        btn_mapa.setOnClickListener {
+            val intentMapa = Intent(this, WeatherMapActivity::class.java)
+            startActivity(intentMapa)
+        }
+
         val duracion = Toast.LENGTH_SHORT
         val toast = Toast.makeText(this, "bienvenido $usuarioDesdeOtroActivity", duracion)
         toast.show()

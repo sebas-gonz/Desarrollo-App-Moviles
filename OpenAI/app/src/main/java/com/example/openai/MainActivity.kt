@@ -32,7 +32,7 @@ class MainActivity : AppCompatActivity() {
                 && edPasswd.text.toString() == passwBase){
 
                 // creo un objeto intent
-                val nuevaVentana = Intent(this, MainActivity2::class.java)
+                val nuevaVentana = Intent(this, WeatherMapActivity::class.java)
                 /**
                  * creo una variable, llamo al metodo putExtra(nombre_put, valor_variable)
                  *

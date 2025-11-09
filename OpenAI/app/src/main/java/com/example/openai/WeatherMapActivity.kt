@@ -15,6 +15,7 @@ import java.net.MalformedURLException
 import java.net.URL
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -33,29 +34,38 @@ import com.google.android.gms.maps.model.MarkerOptions
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import com.example.openai.BuildConfig
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.maps.OnMapReadyCallback
+import com.google.android.gms.maps.model.TileOverlay
+import com.google.android.material.button.MaterialButtonToggleGroup
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 
-class WeatherMapActivity : AppCompatActivity(), com.google.android.gms.maps.OnMapReadyCallback {
+class WeatherMapActivity : AppCompatActivity(), OnMapReadyCallback {
     private lateinit var mMap: GoogleMap
     private val api_weather_key = BuildConfig.OWM_API_KEY
-
-    private var tempMarker: Marker? = null
-
     private val weatherApi = WeatherApiClient.api
+    private var tempMarker: Marker? = null
+    private var currentTileOverlay: TileOverlay? = null // <-- Para guardar la capa actual
+    private var currentLayerType = "temp"
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
             if (isGranted) {
-
                 activarMiUbicacion()
+                zoomToCurrentLocation()
             } else {
-
                 Toast.makeText(this, "Permiso de ubicación denegado", Toast.LENGTH_SHORT).show()
+                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(20.0, 0.0), 2f))
             }
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+
         setContentView(R.layout.activity_weather_map)
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         val mapFragment = supportFragmentManager
             .findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
@@ -64,29 +74,66 @@ class WeatherMapActivity : AppCompatActivity(), com.google.android.gms.maps.OnMa
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
+        val fabChat: FloatingActionButton = findViewById(R.id.fab_open_chat)
+        fabChat.setOnClickListener {
+            val intent = Intent(this, OpenAIActivity::class.java)
+            intent.flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+
+            startActivity(intent)
+        }
+        val toggleGroup: MaterialButtonToggleGroup = findViewById(R.id.toggle_button_group)
+        toggleGroup.addOnButtonCheckedListener { group, checkedId, isChecked ->
+            if (isChecked) {
+                // Borra la capa de color anterior
+                currentTileOverlay?.remove()
+
+                // Actualiza el tipo de capa y añade la nueva
+                when (checkedId) {
+                    R.id.button_temp -> {
+                        currentLayerType = "temp"
+                        addWeatherTileOverlay("temp_new") // Capa de temperatura
+                    }
+                    R.id.button_wind -> {
+                        currentLayerType = "wind"
+                        addWeatherTileOverlay("wind_new") // Capa de viento
+                    }
+                    R.id.button_humidity -> {
+                        currentLayerType = "humidity"
+                    }
+                }
+
+                // Refresca el marcador central con la nueva data
+                refreshMapCenterMarker()
+            }
+        }
     }
 
     override fun onMapReady(googleMap: GoogleMap) {
         mMap = googleMap
-
-
-        val vistaGlobal = LatLng(20.0, 0.0)
-        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(vistaGlobal, 2f))
-
         activarMiUbicacion()
 
+        if (intent.hasExtra("EXTRA_LAT")) {
+            // Centra en la ciudad que preguntó la IA
+            val lat = intent.getDoubleExtra("EXTRA_LAT", 0.0)
+            val lon = intent.getDoubleExtra("EXTRA_LON", 0.0)
+            val initialLocation = LatLng(lat, lon)
+            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(initialLocation, 10f))
+        } else {
+            zoomToCurrentLocation()
+        }
         addWeatherTileOverlay("temp_new")
         mMap.setOnCameraIdleListener {
-            val zoom = mMap.cameraPosition.zoom
-            if (zoom < 6.0f) {
-                tempMarker?.remove()
-                tempMarker = null
-            } else {
-                // Si el zoom es bueno, obtenemos el centro del mapa
-                val centerLatLng = mMap.cameraPosition.target
-                // Llamamos a la nueva función
-                getWeatherForMapCenter(centerLatLng)
-            }
+            refreshMapCenterMarker()
+        }
+    }
+    private fun refreshMapCenterMarker() {
+        val zoom = mMap.cameraPosition.zoom
+        if (zoom < 6.0f) {
+            tempMarker?.remove()
+            tempMarker = null
+        } else {
+            val centerLatLng = mMap.cameraPosition.target
+            getWeatherForMapCenter(centerLatLng)
         }
     }
     private fun activarMiUbicacion() {
@@ -119,36 +166,46 @@ class WeatherMapActivity : AppCompatActivity(), com.google.android.gms.maps.OnMa
                 return try { URL(urlStr) } catch (e: MalformedURLException) { null }
             }
         }
-        mMap.addTileOverlay(
+        currentTileOverlay = mMap.addTileOverlay(
             TileOverlayOptions()
                 .tileProvider(tileProvider)
-                .transparency(0.0f)
+                .transparency(0.3f) // Opacidad
         )
     }
     private fun getWeatherForMapCenter(location: LatLng) {
         lifecycleScope.launch {
             try {
-                // 1. Llamar a la NUEVA API
                 val response = weatherApi.getCurrentWeather(
                     lat = location.latitude,
                     lon = location.longitude,
                     appid = api_weather_key
                 )
-
-                // 2. Borrar marcador antiguo
                 tempMarker?.remove()
 
-                // 3. Crear marcador nuevo
-                val temp = response.main.temp.roundToInt()
+                val (markerText, markerTitle) = when (currentLayerType) {
+                    "temp" -> {
+                        val value = response.main.temp.roundToInt()
+                        Pair("$value°C", "${response.name}: $value°C")
+                    }
+                    "wind" -> {
+                        val value = response.wind.speed.roundToInt() // Viento
+                        Pair("$value km/h", "${response.name} Viento: $value km/h")
+                    }
+                    "humidity" -> {
+                        val value = response.main.humidity // Humedad
+                        Pair("$value%", "${response.name} Humedad: $value%")
+                    }
+                    else -> Pair("", response.name) // Defecto: temperatura
+                }
                 val position = LatLng(response.coord.lat, response.coord.lon)
-                val markerIcon = createCustomMarker(this@WeatherMapActivity, "$temp°C")
+                val markerIcon = createCustomMarker(this@WeatherMapActivity, markerText)
 
                 tempMarker = mMap.addMarker(
                     MarkerOptions()
                         .position(position)
                         .icon(markerIcon)
                         .anchor(0.5f, 1.0f)
-                        .title("${response.name}: $temp°C")
+                        .title(markerTitle)
                 )
 
             } catch (e: Exception) {
@@ -174,5 +231,23 @@ class WeatherMapActivity : AppCompatActivity(), com.google.android.gms.maps.OnMa
         markerView.draw(canvas)
 
         return BitmapDescriptorFactory.fromBitmap(bitmap)
+    }
+    private fun zoomToCurrentLocation() {
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            fusedLocationClient.lastLocation
+                .addOnSuccessListener { location ->
+                    if (location != null) {
+                        val userLatLng = LatLng(location.latitude, location.longitude)
+                        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(userLatLng, 15f))
+                    } else {
+                        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(20.0, 0.0), 2f))
+                        Toast.makeText(this, "Activa el GPS para centrar el mapa", Toast.LENGTH_SHORT).show()
+                    }
+                }
+        }
     }
 }

@@ -8,4 +8,6 @@
     android:textColor="@android:color/black"
     android:textSize="14sp"
     android:textStyle="bold"
+    android:minWidth="60dp"
+    android:gravity="center"
     android:text="25°C" />

@@ -80,14 +80,9 @@ class CiudadDbManager(context: Context) {
 
         val defaultCities = listOf("Santiago", "Valparaíso", "Concepción", "La Serena", "Arica", "Temuco", "Punta Arenas", "Coyhaique", "Antofagasta", "Chillan", "Talca")
         for (cityName in defaultCities) {
-            try {
-
-                val cityWeather = apiCall(cityName)
-                if (cityWeather != null) {
-                    saveCity(cityWeather)
-                }
-            } catch (e: Exception) {
-
+            val cityWeather = apiCall(cityName)
+            if (cityWeather != null) {
+                saveCity(cityWeather)
             }
         }
     }

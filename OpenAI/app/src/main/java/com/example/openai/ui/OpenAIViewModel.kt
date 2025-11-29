@@ -189,5 +189,14 @@ class OpenAIViewModel( application: Application,
         _speakText.value = null
     }
 
+    fun deleteCity(cityName: String) {
+        viewModelScope.launch {
+            ciudadManager.deleteCity(cityName)
+
+            _response.value = "$cityName eliminada."
+            // Leemos la lista actualizada de la BD y la ponemos en el stateflow
+            _cityWeatherList.value = ciudadManager.getCities()
+        }
+    }
 
 }

@@ -21,19 +21,21 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.util.Log
 import android.view.View
+import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
 import com.example.openai.api.WeatherApiClient
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.maps.model.BitmapDescriptor
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
-import com.example.openai.BuildConfig
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.OnMapReadyCallback
@@ -53,7 +55,7 @@ class WeatherMapActivity : AppCompatActivity(), OnMapReadyCallback {
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
             if (isGranted) {
                 activarMiUbicacion()
-                zoomToCurrentLocation()
+                zoomUbicacionActual()
             } else {
                 Toast.makeText(this, "Permiso de ubicación denegado", Toast.LENGTH_SHORT).show()
                 mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(20.0, 0.0), 2f))
@@ -81,6 +83,22 @@ class WeatherMapActivity : AppCompatActivity(), OnMapReadyCallback {
 
             startActivity(intent)
         }
+        val btnLogout: ImageButton = findViewById(R.id.btn_logout)
+        btnLogout.setOnClickListener {
+            // obtener el cliente de google
+            val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).build()
+            val googleSignInClient = GoogleSignIn.getClient(this, gso)
+
+            // cerrar sesion
+            googleSignInClient.signOut().addOnCompleteListener(this) {
+                // volver al login
+                val intentLogin = Intent(this, MainActivity::class.java)
+                // finalizar la vista para que no se pueda volver atras
+                intentLogin.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                startActivity(intentLogin)
+                finish()
+            }
+        }
         val toggleGroup: MaterialButtonToggleGroup = findViewById(R.id.toggle_button_group)
         toggleGroup.addOnButtonCheckedListener { group, checkedId, isChecked ->
             if (isChecked) {
@@ -101,7 +119,6 @@ class WeatherMapActivity : AppCompatActivity(), OnMapReadyCallback {
                         currentLayerType = "humidity"
                     }
                 }
-
                 // Refresca el marcador central con la nueva data
                 refreshMapCenterMarker()
             }
@@ -112,6 +129,10 @@ class WeatherMapActivity : AppCompatActivity(), OnMapReadyCallback {
         mMap = googleMap
         activarMiUbicacion()
 
+        mMap.setPadding(0, 300, 0, 0)
+
+        mMap.mapType = GoogleMap.MAP_TYPE_NORMAL
+
         if (intent.hasExtra("EXTRA_LAT")) {
             // Centra en la ciudad que preguntó la IA
             val lat = intent.getDoubleExtra("EXTRA_LAT", 0.0)
@@ -119,7 +140,7 @@ class WeatherMapActivity : AppCompatActivity(), OnMapReadyCallback {
             val initialLocation = LatLng(lat, lon)
             mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(initialLocation, 10f))
         } else {
-            zoomToCurrentLocation()
+            zoomUbicacionActual()
         }
         addWeatherTileOverlay("temp_new")
         mMap.setOnCameraIdleListener {
@@ -198,7 +219,7 @@ class WeatherMapActivity : AppCompatActivity(), OnMapReadyCallback {
                     else -> Pair("", response.name) // Defecto: temperatura
                 }
                 val position = LatLng(response.coord.lat, response.coord.lon)
-                val markerIcon = createCustomMarker(this@WeatherMapActivity, markerText)
+                val markerIcon = crearMarcador(this@WeatherMapActivity, markerText)
 
                 tempMarker = mMap.addMarker(
                     MarkerOptions()
@@ -216,7 +237,7 @@ class WeatherMapActivity : AppCompatActivity(), OnMapReadyCallback {
             }
         }
     }
-    private fun createCustomMarker(context: Context, text: String): BitmapDescriptor {
+    private fun crearMarcador(context: Context, text: String): BitmapDescriptor {
         val markerView = (context.getSystemService(Context.LAYOUT_INFLATER_SERVICE) as LayoutInflater)
             .inflate(R.layout.marker_temperatura, null)
 
@@ -232,7 +253,7 @@ class WeatherMapActivity : AppCompatActivity(), OnMapReadyCallback {
 
         return BitmapDescriptorFactory.fromBitmap(bitmap)
     }
-    private fun zoomToCurrentLocation() {
+    private fun zoomUbicacionActual() {
         if (ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.ACCESS_FINE_LOCATION

@@ -15,31 +15,31 @@ class CiudadDbManager(context: Context) {
         val db = dbHelper.writableDatabase
 
         val values = ContentValues().apply {
-            put(CiudadContract.CityEntry.COLUMN_NAME, city.name)
-            put(CiudadContract.CityEntry.COLUMN_TEMP, city.main.temp)
-            put(CiudadContract.CityEntry.COLUMN_HUMIDITY, city.main.humidity)
-            put(CiudadContract.CityEntry.COLUMN_WIND_SPEED, city.wind.speed)
-            put(CiudadContract.CityEntry.COLUMN_LAT, city.coord.lat)
-            put(CiudadContract.CityEntry.COLUMN_LON, city.coord.lon)
+            put(CiudadSchema.CityEntry.COLUMN_NAME, city.name)
+            put(CiudadSchema.CityEntry.COLUMN_TEMP, city.main.temp)
+            put(CiudadSchema.CityEntry.COLUMN_HUMIDITY, city.main.humidity)
+            put(CiudadSchema.CityEntry.COLUMN_WIND_SPEED, city.wind.speed)
+            put(CiudadSchema.CityEntry.COLUMN_LAT, city.coord.lat)
+            put(CiudadSchema.CityEntry.COLUMN_LON, city.coord.lon)
         }
 
         // Actualizar la fila si la ciudad tiene el mismo nombre
         val rowsAffected = db.update(
-            CiudadContract.CityEntry.TABLE_NAME,
+            CiudadSchema.CityEntry.TABLE_NAME,
             values,
-            "${CiudadContract.CityEntry.COLUMN_NAME} = ?",
+            "${CiudadSchema.CityEntry.COLUMN_NAME} = ?",
             arrayOf(city.name)
         )
 
         if (rowsAffected == 0) {
-            db.insert(CiudadContract.CityEntry.TABLE_NAME, null, values)
+            db.insert(CiudadSchema.CityEntry.TABLE_NAME, null, values)
         }
     }
 
     fun getCities(): List<CityWeather> {
         val db = dbHelper.readableDatabase
         val cursor = db.query(
-            CiudadContract.CityEntry.TABLE_NAME,
+            CiudadSchema.CityEntry.TABLE_NAME,
             null,
             null,
             null,
@@ -51,12 +51,12 @@ class CiudadDbManager(context: Context) {
         val cities = mutableListOf<CityWeather>()
         with(cursor) {
             while (moveToNext()) {
-                val name = getString(getColumnIndexOrThrow(CiudadContract.CityEntry.COLUMN_NAME))
-                val temp = getDouble(getColumnIndexOrThrow(CiudadContract.CityEntry.COLUMN_TEMP))
-                val humidity = getInt(getColumnIndexOrThrow(CiudadContract.CityEntry.COLUMN_HUMIDITY))
-                val windSpeed = getDouble(getColumnIndexOrThrow(CiudadContract.CityEntry.COLUMN_WIND_SPEED))
-                val lat = getDouble(getColumnIndexOrThrow(CiudadContract.CityEntry.COLUMN_LAT))
-                val lon = getDouble(getColumnIndexOrThrow(CiudadContract.CityEntry.COLUMN_LON))
+                val name = getString(getColumnIndexOrThrow(CiudadSchema.CityEntry.COLUMN_NAME))
+                val temp = getDouble(getColumnIndexOrThrow(CiudadSchema.CityEntry.COLUMN_TEMP))
+                val humidity = getInt(getColumnIndexOrThrow(CiudadSchema.CityEntry.COLUMN_HUMIDITY))
+                val windSpeed = getDouble(getColumnIndexOrThrow(CiudadSchema.CityEntry.COLUMN_WIND_SPEED))
+                val lat = getDouble(getColumnIndexOrThrow(CiudadSchema.CityEntry.COLUMN_LAT))
+                val lon = getDouble(getColumnIndexOrThrow(CiudadSchema.CityEntry.COLUMN_LON))
 
                 // Reconstruimos el objeto CityWeather
                 cities.add(
@@ -85,6 +85,15 @@ class CiudadDbManager(context: Context) {
                 saveCity(cityWeather)
             }
         }
+    }
+
+    fun deleteCity(cityName: String) {
+        val db = dbHelper.writableDatabase
+        db.delete(
+            CiudadSchema.CityEntry.TABLE_NAME,
+            "${CiudadSchema.CityEntry.COLUMN_NAME} = ?",
+            arrayOf(cityName)
+        )
     }
 
 }

@@ -2,7 +2,7 @@ package com.example.openai.db
 
 import android.provider.BaseColumns
 
-object CiudadContract {
+object CiudadSchema {
     object CityEntry : BaseColumns {
         const val TABLE_NAME = "cities"
 

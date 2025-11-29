@@ -3,7 +3,7 @@ package com.example.openai.db
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
-import com.example.openai.db.CiudadContract.CityEntry
+import com.example.openai.db.CiudadSchema.CityEntry
 import android.provider.BaseColumns
 
 class CiudadDbHelper(context: Context) :

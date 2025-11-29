@@ -71,7 +71,7 @@ class OpenAIActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         setContentView(R.layout.activity_open_aiactivity)
 
         tts = TextToSpeech(this, this)
-
+        //elementos del xml
         mensaje = findViewById(R.id.ed_mensaje)
         val enviar: Button = findViewById(R.id.btn_enviar)
         val respuesta: TextView = findViewById(R.id.tx_respuesta)
@@ -79,6 +79,8 @@ class OpenAIActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val Microfono_pregunta: Button = findViewById(R.id.Microfono)
         val btnAddCity: ImageButton = findViewById(R.id.btn_add_city)
         val btnVerMapa: Button = findViewById(R.id.btn_ver_mapa)
+        val btnStopVoice: ImageButton = findViewById(R.id.btn_stop_voice)
+
         setupCityWeatherList()
 
         enviar.setOnClickListener {
@@ -109,6 +111,20 @@ class OpenAIActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 else -> {
                     requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                 }
+            }
+        }
+
+        btnStopVoice.setOnClickListener {
+            // comprueba si el motor de voz esta hablando
+            if (::tts.isInitialized && tts.isSpeaking) {
+                // detiene la voz
+                tts.stop()
+
+                // aviso
+                Toast.makeText(this, "Voz detenida", Toast.LENGTH_SHORT).show()
+
+                // limpiamos el estado en el viewmodel para que no repita la respuesta
+                viewModel.speechHandled()
             }
         }
 
@@ -199,11 +215,17 @@ class OpenAIActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun setupCityWeatherList() {
         val rvCityWeather: RecyclerView = findViewById(R.id.rv_city_weather)
         // Define qué hacer cuando se selecciona una ciudad
-        cityWeatherAdapter = CityWeatherAdapter { city ->
-            viewModel.getForecastForCity(city.name)
-            mensaje.setText("")
-
-        }
+        cityWeatherAdapter = CityWeatherAdapter(
+            onClick = { city ->
+                // para ver el clima de la ciudad
+                viewModel.getForecastForCity(city.name)
+                mensaje.setText("")
+            },
+            onLongClick = { city ->
+                // para eliminar la ciudad
+                mostrarDialogoEliminarCiudad(city.name)
+            }
+        )
         rvCityWeather.adapter = cityWeatherAdapter
     }
 
@@ -227,5 +249,20 @@ class OpenAIActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
 
         builder.show()
+    }
+
+    private fun mostrarDialogoEliminarCiudad(cityName: String) {
+        AlertDialog.Builder(this)
+            .setTitle("Eliminar Ciudad")
+            .setMessage("¿Estás seguro de que quieres eliminar $cityName de tu lista?")
+            .setPositiveButton("Eliminar") { dialog, _ ->
+                // Llamamos al viewmodel para borrar
+                viewModel.deleteCity(cityName)
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancelar") { dialog, _ ->
+                dialog.dismiss()
+            }
+            .show()
     }
 }

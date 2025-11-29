@@ -2,58 +2,113 @@ package com.example.openai
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
+import android.view.View
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ProgressBar
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount
+import com.google.android.gms.auth.api.signin.GoogleSignInClient
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.SignInButton
+import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.tasks.Task
 
 class MainActivity : AppCompatActivity() {
+    private lateinit var googleSignInClient: GoogleSignInClient
+    private lateinit var progressBar: ProgressBar
+    private lateinit var btnGoogle: SignInButton
+
+    private val googleSignInLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+            handleSignInResult(task)
+        } else {
+            // Si el usuario cancela, ocultamos la carga
+            mostrarCarga(false)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
 
-        //inicializamos variables de elementos layout
-        val edUsername:EditText = findViewById(R.id.ed_username)
-        val edPasswd:EditText = findViewById(R.id.ed_password)
-        val btnLogin:Button = findViewById(R.id.btn_login)
-        val txMensaje:TextView = findViewById(R.id.tx_mensaje)
+        progressBar = findViewById(R.id.login_progress)
 
-        // variables para comparar password
-        var usuarioBase = "admin"
-        var passwBase = "admin"
+        // 1. Configurar el botón oficial
+        btnGoogle = findViewById(R.id.sign_in_button)
+        btnGoogle.setSize(SignInButton.SIZE_WIDE)
 
-        btnLogin.setOnClickListener {
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestEmail()
+            .build()
 
-            if(edUsername.text.toString() == usuarioBase
-                && edPasswd.text.toString() == passwBase){
+        googleSignInClient = GoogleSignIn.getClient(this, gso)
 
-                // creo un objeto intent
-                val nuevaVentana = Intent(this, WeatherMapActivity::class.java)
-                /**
-                 * creo una variable, llamo al metodo putExtra(nombre_put, valor_variable)
-                 *
-                 */
-                nuevaVentana.putExtra("sesion", edUsername.text.toString())
-                nuevaVentana.putExtra("par_contrasena", edPasswd.text.toString() )                //abrimos el activity
-                startActivity(nuevaVentana)
-
-                txMensaje.text = "login OK"
-
-
-            }else{
-                txMensaje.text = "login NO"
-            }
-
+        btnGoogle.setOnClickListener {
+            mostrarCarga(true)
+            val signInIntent = googleSignInClient.signInIntent
+            googleSignInLauncher.launch(signInIntent)
         }
+
+
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        val account = GoogleSignIn.getLastSignedInAccount(this)
+        if (account != null) {
+            // si ya esta logeado ir al activity del mapa
+            irAlMapa(account.displayName ?: "Usuario")
+        }
+    }
+
+    private fun handleSignInResult(completedTask: Task<GoogleSignInAccount>) {
+        try {
+            val account = completedTask.getResult(ApiException::class.java)
+            // Login Exitoso
+            val nombre = account.displayName ?: "Usuario Google"
+            Toast.makeText(this, "Bienvenido $nombre", Toast.LENGTH_SHORT).show()
+            irAlMapa(nombre)
+        } catch (e: ApiException) {
+            mostrarCarga(false)
+            Log.w("GoogleLogin", "signInResult:failed code=" + e.statusCode)
+            Toast.makeText(this, "Error de autenticación: ${e.statusCode}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun irAlMapa(nombreUsuario: String) {
+        val nuevaVentana = Intent(this, WeatherMapActivity::class.java)
+        nuevaVentana.putExtra("sesion", nombreUsuario)
+        startActivity(nuevaVentana)
+        finish() // termina esta actividad para que no se pueda regresar al login
+    }
+
+
+    private fun mostrarCarga(cargando: Boolean) {
+        if (cargando) {
+            progressBar.visibility = View.VISIBLE
+            btnGoogle.visibility = View.INVISIBLE // se oculta el boton para que no se pulse 2 veces
+        } else {
+            progressBar.visibility = View.GONE
+            btnGoogle.visibility = View.VISIBLE
         }
     }
 }

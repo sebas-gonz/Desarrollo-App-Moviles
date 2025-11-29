@@ -11,10 +11,11 @@ import com.example.openai.model.CityWeather
 import kotlin.math.roundToInt
 
 class CityWeatherAdapter(
-    private val onClick: (CityWeather) -> Unit
+    private val onClick: (CityWeather) -> Unit,
+    private val onLongClick: (CityWeather) -> Unit
 ) : ListAdapter<CityWeather, CityWeatherAdapter.CityViewHolder>(CityDiffCallback) {
 
-    class CityViewHolder(view: View, val onClick: (CityWeather) -> Unit) : RecyclerView.ViewHolder(view) {
+    class CityViewHolder(view: View, val onClick: (CityWeather) -> Unit, val onLongClick: (CityWeather) -> Unit) : RecyclerView.ViewHolder(view) {
         private val tvName: TextView = view.findViewById(R.id.tv_city_name)
         private val tvTemp: TextView = view.findViewById(R.id.tv_temperature)
         private val tvHumidity: TextView = view.findViewById(R.id.tv_humidity)
@@ -22,10 +23,15 @@ class CityWeatherAdapter(
         private var currentCity: CityWeather? = null
 
         init {
+            // Clic normal (ya lo tenías)
             view.setOnClickListener {
+                currentCity?.let { onClick(it) }
+            }
+            view.setOnLongClickListener {
                 currentCity?.let {
-                    onClick(it)
+                    onLongClick(it)
                 }
+                true // true significa que el evento ha sido consumido
             }
         }
 
@@ -41,7 +47,7 @@ class CityWeatherAdapter(
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CityViewHolder {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.item_weather_city, parent, false)
-        return CityViewHolder(view, onClick)
+        return CityViewHolder(view, onClick, onLongClick)
     }
 
     override fun onBindViewHolder(holder: CityViewHolder, position: Int) {
